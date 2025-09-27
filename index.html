@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>xsukax SQLite Database Viewer</title>
+    <style>
+        :root { --primary: #007AFF; --secondary: #8E8E93; --background: #F2F2F7; --surface: #FFFFFF; --text: #000000; --text-secondary: #8E8E93; --border: #E5E5EA; --error: #FF3B30; --success: #34C759; --warning: #FF9500; --radius: 12px; --shadow: 0 4px 20px rgba(0,0,0,0.08); --blur: saturate(180%) blur(20px); }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; }
+        body { background: linear-gradient(135deg, #F2F2F7 0%, #E5E5EA 100%); color: var(--text); line-height: 1.6; min-height: 100vh; padding: 0; }
+        .header { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,0.85); backdrop-filter: var(--blur); border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+        .header-content { max-width: 1200px; margin: 0 auto; padding: 20px; display: flex; align-items: center; gap: 15px; }
+        .logo { width: 44px; height: 44px; border-radius: 12px; background: linear-gradient(135deg, var(--primary), #5AC8FA); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 18px; box-shadow: 0 4px 15px rgba(0,122,255,0.3); }
+        .brand-info h1 { font-size: 1.8rem; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+        .brand-info p { color: var(--text-secondary); font-size: 0.95rem; }
+        .status-badge { margin-left: auto; padding: 8px 16px; border-radius: 20px; background: var(--surface); border: 1px solid var(--border); font-size: 0.85rem; color: var(--text-secondary); box-shadow: var(--shadow); }
+        .status-badge.ready { color: var(--success); border-color: var(--success); background: rgba(52,199,89,0.1); }
+        .status-badge.error { color: var(--error); border-color: var(--error); background: rgba(255,59,48,0.1); }
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px 40px; }
+        .card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 24px; margin-bottom: 20px; border: 1px solid var(--border); }
+        .upload-area { border: 2px dashed var(--border); border-radius: var(--radius); padding: 60px 20px; text-align: center; cursor: pointer; transition: all 0.3s ease; background: linear-gradient(135deg, rgba(0,122,255,0.02), rgba(175,82,222,0.02)); }
+        .upload-area:hover, .upload-area.dragover { border-color: var(--primary); background: linear-gradient(135deg, rgba(0,122,255,0.08), rgba(175,82,222,0.08)); transform: translateY(-2px); }
+        .upload-icon { font-size: 48px; margin-bottom: 16px; display: block; background: linear-gradient(135deg, var(--primary), #AF52DE); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .upload-text { font-size: 1.1rem; font-weight: 600; margin-bottom: 8px; }
+        .upload-subtext { color: var(--text-secondary); font-size: 0.9rem; }
+        .controls { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+        .control-group { display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+        .control-group label { font-size: 0.85rem; color: var(--text-secondary); font-weight: 500; }
+        select, input[type="text"], input[type="number"] { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 8px; padding: 8px 12px; font-size: 0.9rem; outline: none; min-width: 120px; }
+        select:focus, input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(0,122,255,0.15); }
+        .btn { background: var(--primary); color: white; border: none; border-radius: 8px; padding: 10px 16px; font-size: 0.9rem; font-weight: 500; cursor: pointer; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; }
+        .btn:hover { background: #0056CC; transform: translateY(-1px); }
+        .btn:disabled { background: var(--secondary); cursor: not-allowed; transform: none; }
+        .btn-secondary { background: var(--secondary); }
+        .btn-secondary:hover { background: #6D6D72; }
+        .btn-success { background: var(--success); }
+        .btn-success:hover { background: #30A14E; }
+        .btn-small { padding: 6px 12px; font-size: 0.8rem; }
+        .pagination { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+        .page-info { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.85rem; color: var(--text-secondary); }
+        .table-container { overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); max-height: 70vh; }
+        .data-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 600px; }
+        .data-table th, .data-table td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; max-width: 300px; overflow: hidden; text-overflow: ellipsis; }
+        .data-table th { position: sticky; top: 0; background: rgba(248,248,248,0.95); backdrop-filter: var(--blur); font-weight: 600; color: var(--text-secondary); z-index: 10; }
+        .data-table tr:hover td { background: rgba(0,122,255,0.04); }
+        .data-table .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+        .data-table .null { color: var(--text-secondary); font-style: italic; }
+        .data-table .blob { color: var(--warning); font-size: 0.8rem; }
+        .footer-info { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; font-size: 0.85rem; color: var(--text-secondary); }
+        .status { padding: 12px 16px; border-radius: var(--radius); margin-bottom: 20px; text-align: center; font-weight: 500; }
+        .status.loading { background: rgba(0,122,255,0.1); color: var(--primary); border: 1px solid rgba(0,122,255,0.2); }
+        .status.error { background: rgba(255,59,48,0.1); color: var(--error); border: 1px solid rgba(255,59,48,0.2); }
+        .status.success { background: rgba(52,199,89,0.1); color: var(--success); border: 1px solid rgba(52,199,89,0.2); }
+        .db-info { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; font-size: 0.9rem; margin-bottom: 16px; }
+        .db-info dt { color: var(--text-secondary); font-weight: 500; }
+        .db-info dd { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; color: var(--text); }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(4px); }
+        .modal-overlay.active { display: flex; }
+        .modal { background: var(--surface); border-radius: var(--radius); padding: 24px; max-width: 500px; width: 90%; box-shadow: 0 20px 40px rgba(0,0,0,0.15); border: 1px solid var(--border); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-title { font-size: 1.2rem; font-weight: 600; }
+        .modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary); width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+        .modal-close:hover { background: var(--background); }
+        .modal-options { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+        .radio-option { display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.2s ease; }
+        .radio-option:hover { background: var(--background); }
+        .radio-option input[type="radio"] { margin: 0; }
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+        .hidden { display: none !important; }
+        .empty-state { text-align: center; padding: 40px 20px; color: var(--text-secondary); }
+        .empty-state-icon { font-size: 64px; margin-bottom: 16px; opacity: 0.5; }
+        @media (max-width: 768px) { 
+            .container { padding: 0 15px 30px; }
+            .header-content { padding: 15px; flex-direction: column; text-align: center; gap: 10px; }
+            .brand-info h1 { font-size: 1.5rem; }
+            .controls { flex-direction: column; align-items: stretch; }
+            .control-group { justify-content: space-between; }
+            .pagination { margin-left: 0; margin-top: 10px; justify-content: center; }
+            .data-table th, .data-table td { padding: 8px 12px; font-size: 0.85rem; }
+            .footer-info { flex-direction: column; gap: 8px; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">X</div>
+            <div class="brand-info">
+                <h1>xsukax SQLite Database Viewer</h1>
+                <p>Professional SQLite database viewer with CSV export capabilities</p>
+            </div>
+            <div id="status-badge" class="status-badge">Initializing...</div>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="card">
+            <div id="upload-area" class="upload-area">
+                <span class="upload-icon">📄</span>
+                <div class="upload-text">Drop SQLite database file here or click to browse</div>
+                <div class="upload-subtext">Supports .db, .sqlite, .sqlite3 files</div>
+                <input type="file" id="file-input" accept=".db,.sqlite,.sqlite3,.sqlite2,.dat" style="display: none;">
+            </div>
+            <div id="status-msg" class="status hidden"></div>
+        </div>
+
+        <div id="database-section" class="hidden">
+            <div class="card">
+                <dl class="db-info">
+                    <dt>Database File:</dt><dd id="db-filename">—</dd>
+                    <dt>File Size:</dt><dd id="db-size">—</dd>
+                    <dt>Tables Found:</dt><dd id="db-tables">—</dd>
+                    <dt>Engine:</dt><dd>sql.js / WebAssembly</dd>
+                </dl>
+            </div>
+
+            <div class="card">
+                <div class="controls">
+                    <div class="control-group">
+                        <label>Table:</label>
+                        <select id="table-select" disabled>
+                            <option value="">Select a table...</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>Search:</label>
+                        <input type="text" id="search-input" placeholder="Filter rows..." disabled>
+                    </div>
+                    <div class="control-group">
+                        <label>Page Size:</label>
+                        <select id="page-size" disabled>
+                            <option value="50">50</option>
+                            <option value="100" selected>100</option>
+                            <option value="250">250</option>
+                            <option value="500">500</option>
+                        </select>
+                    </div>
+                    <button id="refresh-btn" class="btn btn-secondary btn-small" disabled>Refresh</button>
+                    <button id="export-btn" class="btn btn-success btn-small" disabled>Export CSV</button>
+                    <div class="pagination">
+                        <button id="prev-btn" class="btn btn-secondary btn-small" disabled>←</button>
+                        <span class="page-info" id="page-info">—</span>
+                        <button id="next-btn" class="btn btn-secondary btn-small" disabled>→</button>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table id="data-table" class="data-table">
+                        <thead id="table-head"></thead>
+                        <tbody id="table-body">
+                            <tr><td class="empty-state"><div class="empty-state-icon">📊</div>Select a table to view data</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="footer-info">
+                    <span id="row-count">—</span>
+                    <span>Render time: <span id="render-time">—</span>ms</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Modal -->
+    <div id="export-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Export to CSV</h3>
+                <button class="modal-close" id="modal-close">×</button>
+            </div>
+            <div class="modal-options">
+                <label class="radio-option">
+                    <input type="radio" name="export-mode" value="current" checked>
+                    <span><strong>Current page</strong> - Export visible rows only</span>
+                </label>
+                <label class="radio-option">
+                    <input type="radio" name="export-mode" value="filtered">
+                    <span><strong>All filtered</strong> - Export all rows matching search</span>
+                </label>
+                <label class="radio-option">
+                    <input type="radio" name="export-mode" value="all">
+                    <span><strong>Full table</strong> - Export entire table</span>
+                </label>
+                <label class="radio-option">
+                    <input type="checkbox" id="include-headers" checked>
+                    <span>Include column headers</span>
+                </label>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancel-export">Cancel</button>
+                <button class="btn btn-success" id="confirm-export">Download CSV</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Application state
+        let SQL = null;
+        let db = null;
+        let dbBytes = null;
+        let currentTable = null;
+        let currentColumns = [];
+        let currentPage = 1;
+        let totalRows = 0;
+        let isEngineReady = false;
+
+        // DOM elements
+        const statusBadge = document.getElementById('status-badge');
+        const uploadArea = document.getElementById('upload-area');
+        const fileInput = document.getElementById('file-input');
+        const statusMsg = document.getElementById('status-msg');
+        const databaseSection = document.getElementById('database-section');
+        const dbFilename = document.getElementById('db-filename');
+        const dbSize = document.getElementById('db-size');
+        const dbTables = document.getElementById('db-tables');
+        const tableSelect = document.getElementById('table-select');
+        const searchInput = document.getElementById('search-input');
+        const pageSize = document.getElementById('page-size');
+        const refreshBtn = document.getElementById('refresh-btn');
+        const exportBtn = document.getElementById('export-btn');
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const pageInfo = document.getElementById('page-info');
+        const rowCount = document.getElementById('row-count');
+        const renderTime = document.getElementById('render-time');
+        const tableHead = document.getElementById('table-head');
+        const tableBody = document.getElementById('table-body');
+        const exportModal = document.getElementById('export-modal');
+        const modalClose = document.getElementById('modal-close');
+        const cancelExport = document.getElementById('cancel-export');
+        const confirmExport = document.getElementById('confirm-export');
+        const includeHeaders = document.getElementById('include-headers');
+
+        // Utility functions
+        const formatBytes = (bytes) => {
+            if (!bytes) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        };
+
+        const escapeIdentifier = (name) => `"${String(name).replace(/"/g, '""')}"`;
+
+        const escapeHtml = (str) => {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        };
+
+        const isBlob = (value) => {
+            return value && typeof value === 'object' && 
+                   (value instanceof Uint8Array || (value.buffer && value.BYTES_PER_ELEMENT === 1));
+        };
+
+        const formatCell = (value) => {
+            if (value === null) return '<span class="null">NULL</span>';
+            if (isBlob(value)) return `<span class="blob mono">[BLOB ${value.length} bytes]</span>`;
+            if (typeof value === 'number') return `<span class="mono">${value}</span>`;
+            return escapeHtml(String(value));
+        };
+
+        const debounce = (func, wait) => {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        };
+
+        // Status and control functions
+        const setStatus = (message, type = '') => {
+            statusMsg.textContent = message;
+            statusMsg.className = `status ${type}`;
+            statusMsg.classList.remove('hidden');
+            
+            if (type === 'success') {
+                setTimeout(() => statusMsg.classList.add('hidden'), 3000);
+            }
+        };
+
+        const setEngineStatus = (status, isReady = false) => {
+            statusBadge.textContent = status;
+            statusBadge.className = `status-badge ${isReady ? 'ready' : (status.includes('error') ? 'error' : '')}`;
+            isEngineReady = isReady;
+        };
+
+        const enableControls = (enabled) => {
+            [searchInput, pageSize, refreshBtn, exportBtn, prevBtn, nextBtn].forEach(el => {
+                el.disabled = !enabled;
+            });
+        };
+
+        const enableTableSelector = (enabled) => {
+            tableSelect.disabled = !enabled;
+        };
+
+        // Database functions
+        const closeDatabase = () => {
+            try {
+                if (db) {
+                    db.close();
+                    db = null;
+                }
+            } catch (e) {
+                console.warn('Error closing database:', e);
+            }
+        };
+
+        const resetState = () => {
+            closeDatabase();
+            dbBytes = null;
+            currentTable = null;
+            currentColumns = [];
+            currentPage = 1;
+            totalRows = 0;
+            
+            // Reset UI
+            dbFilename.textContent = '—';
+            dbSize.textContent = '—';
+            dbTables.textContent = '—';
+            tableSelect.innerHTML = '<option value="">Select a table...</option>';
+            tableHead.innerHTML = '';
+            tableBody.innerHTML = '<tr><td class="empty-state"><div class="empty-state-icon">📊</div>Select a table to view data</td></tr>';
+            pageInfo.textContent = '—';
+            rowCount.textContent = '—';
+            renderTime.textContent = '—';
+            
+            enableControls(false);
+            enableTableSelector(false);
+            databaseSection.classList.add('hidden');
+        };
+
+        const getTables = () => {
+            try {
+                const result = db.exec("SELECT name FROM sqlite_master WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%' ORDER BY name");
+                return result.length ? result[0].values.map(row => String(row[0])) : [];
+            } catch (error) {
+                console.error('Error getting tables:', error);
+                return [];
+            }
+        };
+
+        const getTableColumns = (tableName) => {
+            try {
+                const escapedTable = escapeIdentifier(tableName);
+                const result = db.exec(`PRAGMA table_info(${escapedTable})`);
+                
+                if (result.length && result[0].values.length) {
+                    return result[0].values.map(row => String(row[1]));
+                }
+                
+                // Fallback: get columns from first row
+                const sampleResult = db.exec(`SELECT * FROM ${escapedTable} LIMIT 1`);
+                return sampleResult.length ? sampleResult[0].columns.map(String) : [];
+            } catch (error) {
+                console.error('Error getting columns:', error);
+                return [];
+            }
+        };
+
+        const getRowCount = (tableName, searchTerm = '') => {
+            try {
+                const escapedTable = escapeIdentifier(tableName);
+                let sql, params = [];
+                
+                if (searchTerm) {
+                    const likeConditions = currentColumns.map(col => `${escapeIdentifier(col)} LIKE ?`).join(' OR ');
+                    sql = `SELECT COUNT(*) as count FROM ${escapedTable} WHERE ${likeConditions}`;
+                    params = Array(currentColumns.length).fill(`%${searchTerm}%`);
+                } else {
+                    sql = `SELECT COUNT(*) as count FROM ${escapedTable}`;
+                }
+                
+                const stmt = db.prepare(sql);
+                const result = stmt.getAsObject(params);
+                stmt.free();
+                
+                return Number(result.count || 0);
+            } catch (error) {
+                console.error('Error getting row count:', error);
+                return 0;
+            }
+        };
+
+        const fetchTableData = (tableName, searchTerm = '', limit = 100, offset = 0) => {
+            try {
+                const escapedTable = escapeIdentifier(tableName);
+                const escapedColumns = currentColumns.map(col => escapeIdentifier(col)).join(', ');
+                
+                let sql, params = [];
+                
+                if (searchTerm) {
+                    const likeConditions = currentColumns.map(col => `${escapeIdentifier(col)} LIKE ?`).join(' OR ');
+                    sql = `SELECT ${escapedColumns} FROM ${escapedTable} WHERE ${likeConditions} LIMIT ? OFFSET ?`;
+                    params = Array(currentColumns.length).fill(`%${searchTerm}%`).concat([limit, offset]);
+                } else {
+                    sql = `SELECT ${escapedColumns} FROM ${escapedTable} LIMIT ? OFFSET ?`;
+                    params = [limit, offset];
+                }
+                
+                const stmt = db.prepare(sql);
+                const rows = [];
+                
+                stmt.bind(params);
+                while (stmt.step()) {
+                    rows.push(stmt.get());
+                }
+                stmt.free();
+                
+                return rows;
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                return [];
+            }
+        };
+
+        const renderTableData = (data) => {
+            const startTime = performance.now();
+            
+            // Render headers
+            tableHead.innerHTML = `<tr>${currentColumns.map(col => `<th>${escapeHtml(col)}</th>`).join('')}</tr>`;
+            
+            // Render rows
+            if (data.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="${currentColumns.length || 1}" class="empty-state"><div class="empty-state-icon">📭</div>No data found</td></tr>`;
+            } else {
+                tableBody.innerHTML = data.map(row => 
+                    `<tr>${row.map(cell => `<td>${formatCell(cell)}</td>`).join('')}</tr>`
+                ).join('');
+            }
+            
+            const endTime = performance.now();
+            renderTime.textContent = Math.round(endTime - startTime);
+        };
+
+        const loadTableData = (reset = false) => {
+            if (!currentTable || !db) return;
+            
+            if (reset) currentPage = 1;
+            
+            const searchTerm = searchInput.value.trim();
+            const limit = parseInt(pageSize.value);
+            const offset = (currentPage - 1) * limit;
+            
+            // Get total count
+            totalRows = getRowCount(currentTable, searchTerm);
+            const totalPages = Math.max(1, Math.ceil(totalRows / limit));
+            
+            // Adjust current page if necessary
+            if (currentPage > totalPages) {
+                currentPage = totalPages;
+            }
+            
+            // Fetch and render data
+            const data = fetchTableData(currentTable, searchTerm, limit, (currentPage - 1) * limit);
+            renderTableData(data);
+            
+            // Update UI
+            pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+            rowCount.textContent = `${totalRows.toLocaleString()} rows • ${currentColumns.length} columns`;
+            
+            // Update pagination buttons
+            prevBtn.disabled = currentPage <= 1;
+            nextBtn.disabled = currentPage >= totalPages;
+            
+            enableControls(true);
+        };
+
+        // File handling
+        const handleFile = async (file) => {
+            if (!isEngineReady) {
+                setStatus('Database engine not ready. Please wait.', 'error');
+                return;
+            }
+            
+            if (!file) {
+                setStatus('No file selected.', 'error');
+                return;
+            }
+            
+            setStatus('Loading database...', 'loading');
+            
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                dbBytes = new Uint8Array(arrayBuffer);
+                
+                closeDatabase();
+                db = new SQL.Database(dbBytes);
+                
+                // Verify database integrity
+                const integrityResult = db.exec('PRAGMA integrity_check');
+                const isValid = integrityResult && integrityResult[0] && 
+                               integrityResult[0].values && integrityResult[0].values[0] &&
+                               String(integrityResult[0].values[0][0]).toLowerCase() === 'ok';
+                
+                if (!isValid) {
+                    setStatus('Database loaded with warnings. Integrity check failed.', 'error');
+                } else {
+                    setStatus('Database loaded successfully!', 'success');
+                }
+                
+                // Update database info
+                dbFilename.textContent = file.name;
+                dbSize.textContent = formatBytes(file.size);
+                
+                // Get tables
+                const tables = getTables();
+                dbTables.textContent = tables.length.toString();
+                
+                // Populate table selector
+                tableSelect.innerHTML = '<option value="">Select a table...</option>' +
+                    tables.map(table => `<option value="${escapeHtml(table)}">${escapeHtml(table)}</option>`).join('');
+                
+                if (tables.length === 0) {
+                    setStatus('No user tables found in database.', 'error');
+                    enableControls(false);
+                    enableTableSelector(false);
+                } else {
+                    databaseSection.classList.remove('hidden');
+                    enableControls(false); // Other controls disabled until table is selected
+                    enableTableSelector(true); // But table selector should be enabled
+                }
+                
+            } catch (error) {
+                resetState();
+                setStatus(`Failed to load database: ${error.message}`, 'error');
+            }
+        };
+
+        // CSV Export
+        const generateCSV = (data, columns, includeHeader = true) => {
+            const escapeCSVField = (field) => {
+                if (field === null) return '';
+                if (isBlob(field)) return `"[BLOB ${field.length} bytes]"`;
+                
+                const str = String(field);
+                if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+                    return `"${str.replace(/"/g, '""')}"`;
+                }
+                return str;
+            };
+            
+            const lines = [];
+            
+            if (includeHeader) {
+                lines.push(columns.map(escapeCSVField).join(','));
+            }
+            
+            data.forEach(row => {
+                lines.push(row.map(escapeCSVField).join(','));
+            });
+            
+            return '\ufeff' + lines.join('\r\n'); // UTF-8 BOM for Excel compatibility
+        };
+
+        const getAllTableData = (tableName, searchTerm = '') => {
+            try {
+                const escapedTable = escapeIdentifier(tableName);
+                const escapedColumns = currentColumns.map(col => escapeIdentifier(col)).join(', ');
+                
+                let sql, params = [];
+                
+                if (searchTerm) {
+                    const likeConditions = currentColumns.map(col => `${escapeIdentifier(col)} LIKE ?`).join(' OR ');
+                    sql = `SELECT ${escapedColumns} FROM ${escapedTable} WHERE ${likeConditions}`;
+                    params = Array(currentColumns.length).fill(`%${searchTerm}%`);
+                } else {
+                    sql = `SELECT ${escapedColumns} FROM ${escapedTable}`;
+                }
+                
+                const stmt = db.prepare(sql);
+                const rows = [];
+                
+                stmt.bind(params);
+                while (stmt.step()) {
+                    rows.push(stmt.get());
+                }
+                stmt.free();
+                
+                return rows;
+            } catch (error) {
+                console.error('Error fetching all data:', error);
+                return [];
+            }
+        };
+
+        const downloadCSV = (filename, csvContent) => {
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        };
+
+        // Event listeners
+        uploadArea.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        // Drag and drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            if (e.dataTransfer.files.length) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        // Table selection
+        tableSelect.addEventListener('change', (e) => {
+            const tableName = e.target.value;
+            if (!tableName) {
+                currentTable = null;
+                currentColumns = [];
+                tableHead.innerHTML = '';
+                tableBody.innerHTML = '<tr><td class="empty-state"><div class="empty-state-icon">📊</div>Select a table to view data</td></tr>';
+                pageInfo.textContent = '—';
+                rowCount.textContent = '—';
+                renderTime.textContent = '—';
+                enableControls(false);
+                return;
+            }
+            
+            currentTable = tableName;
+            currentColumns = getTableColumns(tableName);
+            loadTableData(true);
+        });
+
+        // Search with debouncing
+        searchInput.addEventListener('input', debounce(() => {
+            if (currentTable) {
+                loadTableData(true);
+            }
+        }, 300));
+
+        // Page size change
+        pageSize.addEventListener('change', () => {
+            if (currentTable) {
+                loadTableData(true);
+            }
+        });
+
+        // Pagination
+        prevBtn.addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                loadTableData();
+            }
+        });
+
+        nextBtn.addEventListener('click', () => {
+            const totalPages = Math.max(1, Math.ceil(totalRows / parseInt(pageSize.value)));
+            if (currentPage < totalPages) {
+                currentPage++;
+                loadTableData();
+            }
+        });
+
+        // Refresh
+        refreshBtn.addEventListener('click', () => {
+            if (currentTable) {
+                loadTableData(false);
+            }
+        });
+
+        // Export modal
+        exportBtn.addEventListener('click', () => {
+            exportModal.classList.add('active');
+        });
+
+        modalClose.addEventListener('click', () => {
+            exportModal.classList.remove('active');
+        });
+
+        cancelExport.addEventListener('click', () => {
+            exportModal.classList.remove('active');
+        });
+
+        confirmExport.addEventListener('click', () => {
+            const mode = document.querySelector('input[name="export-mode"]:checked').value;
+            const includeHeader = document.getElementById('include-headers').checked;
+            const searchTerm = searchInput.value.trim();
+            
+            let data;
+            let suffix;
+            
+            switch (mode) {
+                case 'current':
+                    data = Array.from(tableBody.querySelectorAll('tr')).slice(0, -1).map(row => 
+                        Array.from(row.querySelectorAll('td')).map(cell => cell.textContent.trim())
+                    );
+                    suffix = 'page';
+                    break;
+                case 'filtered':
+                    data = getAllTableData(currentTable, searchTerm);
+                    suffix = searchTerm ? 'filtered' : 'full';
+                    break;
+                case 'all':
+                    data = getAllTableData(currentTable);
+                    suffix = 'full';
+                    break;
+            }
+            
+            const csv = generateCSV(data, currentColumns, includeHeader);
+            const filename = `${currentTable}_${suffix}.csv`;
+            
+            downloadCSV(filename, csv);
+            exportModal.classList.remove('active');
+            
+            setStatus(`Exported ${data.length} rows to ${filename}`, 'success');
+        });
+
+        // Initialize SQL.js engine
+        const initializeEngine = async () => {
+            try {
+                setEngineStatus('Loading engine...');
+                
+                // Try multiple CDNs for better reliability
+                const cdnUrls = [
+                    'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js',
+                    'https://cdn.jsdelivr.net/npm/sql.js@1.8.0/dist/sql-wasm.js',
+                    'https://unpkg.com/sql.js@1.8.0/dist/sql-wasm.js'
+                ];
+                
+                let sqlJs = null;
+                let lastError = null;
+                
+                for (const url of cdnUrls) {
+                    try {
+                        await new Promise((resolve, reject) => {
+                            const script = document.createElement('script');
+                            script.src = url;
+                            script.onload = resolve;
+                            script.onerror = reject;
+                            document.head.appendChild(script);
+                        });
+                        
+                        if (typeof initSqlJs === 'function') {
+                            const baseUrl = url.substring(0, url.lastIndexOf('/'));
+                            sqlJs = await initSqlJs({
+                                locateFile: file => `${baseUrl}/${file}`
+                            });
+                            break;
+                        }
+                    } catch (error) {
+                        lastError = error;
+                        console.warn(`Failed to load from ${url}:`, error);
+                    }
+                }
+                
+                if (!sqlJs) {
+                    throw lastError || new Error('All CDNs failed to load sql.js');
+                }
+                
+                SQL = sqlJs;
+                setEngineStatus('Engine ready', true);
+                setStatus('Ready to load database files.', 'success');
+                enableTableSelector(false); // No database loaded yet
+                
+            } catch (error) {
+                setEngineStatus('Engine error', false);
+                setStatus(`Failed to initialize database engine: ${error.message}`, 'error');
+            }
+        };
+
+        // Initialize the application
+        initializeEngine();
+    </script>
+</body>
+</html>
